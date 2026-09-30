@@ -1,0 +1,334 @@
+# =============================================================================
+# FACIAL EMOTION DETECTION - MASTER CONFIGURATION
+# =============================================================================
+# All parameters are configurable. Override per-model settings in
+# config/experiments/<model_name>.yml
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Project Settings
+# ---------------------------------------------------------------------------
+project:
+  name: facial_emotion_detection
+  seed: 42
+  device: auto                    # auto | cuda | cpu | mps
+  deterministic: true             # reproducible results (may slow training)
+  num_workers: 4                  # dataloader workers
+  pin_memory: true                # pin memory for GPU transfer
+
+# ---------------------------------------------------------------------------
+# Data Configuration
+# ---------------------------------------------------------------------------
+data:
+  raw_dir: data/raw               # root of raw image folders
+  processed_dir: data/processed   # for cached/processed data
+  image_size: [48, 48]            # [height, width]
+  color_mode: grayscale           # grayscale | rgb
+  num_classes: 7
+  class_names:
+    - Angry
+    - Disgust
+    - Fear
+    - Happy
+    - Sad
+    - Surprise
+    - Neutral
+  # Maps class index -> folder name under raw_dir
+  class_to_folder:
+    "0": "1"
+    "1": "2"
+    "2": "3"
+    "3": "4"
+    "4": "5"
+    "5": "6"
+    "6": "7"
+  val_split: 0.15                 # fraction of train data used for validation
+  use_predefined_split: true      # use train_/test_ filename prefix to split
+  cache_images: false             # load all images into RAM
+
+# ---------------------------------------------------------------------------
+# Augmentation Pipeline
+# ---------------------------------------------------------------------------
+augmentation:
+  enabled: true
+  # Training augmentations
+  train:
+    random_horizontal_flip: 0.5
+    random_rotation: 10           # degrees
+    random_affine:
+      enabled: false
+      degrees: 10
+      translate: [0.1, 0.1]
+      scale: [0.9, 1.1]
+    random_erasing:
+      enabled: false
+      p: 0.2
+      scale: [0.02, 0.15]
+    color_jitter:
+      enabled: false
+      brightness: 0.2
+      contrast: 0.2
+      saturation: 0.0
+      hue: 0.0
+    gaussian_blur:
+      enabled: false
+      kernel_size: 3
+  # Normalization (applied to both train and test)
+  normalize:
+    mean: [0.5]                   # single value for grayscale, 3 for rgb
+    std: [0.5]
+
+# ---------------------------------------------------------------------------
+# Model Configuration
+# ---------------------------------------------------------------------------
+model:
+  name: cnn                       # Model to train. Options:
+                                  #   cnn, rnn, lstm, lstm_attention,
+                                  #   bilstm, bilstm_attention, residual_bilstm,
+                                  #   cnn_lstm, cnn_bilstm,
+                                  #   vision_transformer, swin_transformer
+
+  # ----- CNN -----
+  cnn:
+    channels: [32, 64, 128, 256]
+    kernel_sizes: [3, 3, 3, 3]
+    pool_sizes: [2, 2, 2, 2]
+    fc_dims: [512]
+    dropout: 0.5
+    batch_norm: true
+    activation: relu              # relu | leaky_relu | elu | gelu
+
+  # ----- RNN -----
+  rnn:
+    hidden_size: 256
+    num_layers: 2
+    dropout: 0.3
+    bidirectional: false
+    nonlinearity: tanh            # tanh | relu
+    fc_dims: [128]
+
+  # ----- LSTM -----
+  lstm:
+    hidden_size: 256
+    num_layers: 2
+    dropout: 0.3
+    bidirectional: false
+    fc_dims: [128]
+
+  # ----- LSTM-Attention -----
+  lstm_attention:
+    hidden_size: 256
+    num_layers: 2
+    dropout: 0.3
+    attention_dim: 128
+    fc_dims: [128]
+
+  # ----- BiLSTM -----
+  bilstm:
+    hidden_size: 256
+    num_layers: 2
+    dropout: 0.3
+    fc_dims: [128]
+
+  # ----- BiLSTM-Attention -----
+  bilstm_attention:
+    hidden_size: 256
+    num_layers: 2
+    dropout: 0.3
+    attention_dim: 128
+    fc_dims: [128]
+
+  # ----- Residual BiLSTM -----
+  residual_bilstm:
+    hidden_size: 256
+    num_layers: 4
+    dropout: 0.3
+    fc_dims: [128]
+
+  # ----- CNN-LSTM -----
+  cnn_lstm:
+    cnn_channels: [32, 64, 128]
+    cnn_kernel_sizes: [3, 3, 3]
+    lstm_hidden_size: 256
+    lstm_num_layers: 2
+    lstm_dropout: 0.3
+    fc_dims: [128]
+    dropout: 0.5
+
+  # ----- CNN-BiLSTM -----
+  cnn_bilstm:
+    cnn_channels: [32, 64, 128]
+    cnn_kernel_sizes: [3, 3, 3]
+    lstm_hidden_size: 256
+    lstm_num_layers: 2
+    lstm_dropout: 0.3
+    fc_dims: [128]
+    dropout: 0.5
+
+  # ----- Vision Transformer (ViT) -----
+  vision_transformer:
+    patch_size: 8                 # image will be split into (H/patch)^2 patches
+    embed_dim: 256
+    num_heads: 8
+    num_layers: 6
+    mlp_dim: 512
+    dropout: 0.1
+    emb_dropout: 0.1
+
+  # ----- Swin Transformer -----
+  swin_transformer:
+    patch_size: 4
+    embed_dim: 96
+    depths: [2, 2, 6, 2]
+    num_heads: [3, 6, 12, 24]
+    window_size: 6
+    mlp_ratio: 4.0
+    dropout: 0.1
+    attention_dropout: 0.1
+
+# ---------------------------------------------------------------------------
+# Training Configuration
+# ---------------------------------------------------------------------------
+training:
+  batch_size: 64
+  epochs: 100
+  learning_rate: 0.001
+  optimizer: adam                  # adam | adamw | sgd | rmsprop
+  optimizer_params:
+    # Adam / AdamW
+    betas: [0.9, 0.999]
+    eps: 1.0e-8
+    # SGD
+    momentum: 0.9
+    nesterov: true
+  weight_decay: 0.0001
+  gradient_clip_value: 1.0        # 0 to disable
+  label_smoothing: 0.0            # 0 to disable
+
+  # Learning rate scheduler
+  scheduler:
+    type: cosine_annealing        # step | cosine_annealing | reduce_on_plateau
+                                  # cosine_warm_restarts | one_cycle | none
+    step:
+      step_size: 20
+      gamma: 0.5
+    cosine_annealing:
+      T_max: 100
+      eta_min: 1.0e-6
+    reduce_on_plateau:
+      mode: min
+      factor: 0.5
+      patience: 5
+      min_lr: 1.0e-7
+    cosine_warm_restarts:
+      T_0: 10
+      T_mult: 2
+      eta_min: 1.0e-6
+    one_cycle:
+      max_lr: 0.01
+      pct_start: 0.3
+      anneal_strategy: cos
+
+  # ----- K-Fold Cross Validation -----
+  kfold:
+    enabled: false
+    n_splits: 5
+    shuffle: true
+    stratified: true              # stratified splitting
+
+  # ----- Nested K-Fold (for hyperparameter tuning + evaluation) -----
+  nested_kfold:
+    enabled: false
+    outer_splits: 5               # outer loop for evaluation
+    inner_splits: 3               # inner loop for hyperparameter tuning
+    shuffle: true
+    stratified: true
+
+  # ----- Hyperparameter Tuning -----
+  hyperparameter_tuning:
+    enabled: false
+    backend: optuna               # optuna (only supported backend)
+    n_trials: 30
+    timeout: 7200                 # seconds; null for no timeout
+    direction: maximize           # maximize | minimize
+    metric: val_f1_macro          # metric to optimize
+    pruning: true                 # prune unpromising trials early
+    search_spaces:
+      learning_rate:
+        type: loguniform
+        low: 0.00001
+        high: 0.01
+      batch_size:
+        type: categorical
+        choices: [16, 32, 64, 128]
+      weight_decay:
+        type: loguniform
+        low: 0.000001
+        high: 0.01
+      dropout:
+        type: uniform
+        low: 0.1
+        high: 0.6
+      optimizer:
+        type: categorical
+        choices: [adam, adamw, sgd]
+
+  # ----- Class Balancing -----
+  class_balancing:
+    enabled: true
+    method: class_weights         # class_weights | oversampling
+    # class_weights: uses inverse frequency weights in the loss function
+    # oversampling: uses WeightedRandomSampler to oversample minority classes
+
+  # ----- Early Stopping -----
+  early_stopping:
+    enabled: true
+    patience: 15
+    monitor: val_loss
+    mode: min                     # min (loss) | max (metric)
+    min_delta: 0.001
+    restore_best_weights: true
+
+  # ----- Model Checkpointing -----
+  checkpointing:
+    enabled: true
+    save_best_only: true
+    monitor: val_f1_macro
+    mode: max
+    save_dir: results/models
+
+# ---------------------------------------------------------------------------
+# Evaluation Metrics
+# ---------------------------------------------------------------------------
+evaluation:
+  metrics:
+    - accuracy
+    - f1_macro
+    - f1_weighted
+    - precision_macro
+    - recall_macro
+    - auc_macro
+    - fpr_per_class
+  confidence_interval: 0.95       # CI level for bootstrap metrics
+  bootstrap_iterations: 1000      # number of bootstrap samples for CI
+  compute_std: true               # compute std across folds (if k-fold)
+  compute_time: true              # track training/inference time
+  confusion_matrix: true
+  classification_report: true
+  per_class_metrics: true
+  roc_curves: true
+
+# ---------------------------------------------------------------------------
+# Logging & Output
+# ---------------------------------------------------------------------------
+logging:
+  verbose: 1                      # 0=silent, 1=progress, 2=detailed
+  log_dir: results/logs
+  save_plots: true
+  plots_dir: results/plots
+  save_results_json: true
+  results_dir: results/tables
+  tensorboard:
+    enabled: false
+    log_dir: results/logs/tensorboard
+  progress_bar: true              # tqdm progress bar
