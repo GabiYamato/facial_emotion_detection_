@@ -1,0 +1,105 @@
+# Experiment 2: quick CNN baseline for development and smoke testing.
+
+project:
+  name: facial_emotion_detection_experiment2
+  seed: 42
+  device: auto
+  deterministic: true
+  num_workers: 2
+  pin_memory: true
+
+data:
+  raw_dir: data/raw
+  image_size: [48, 48]
+  color_mode: grayscale
+  num_classes: 7
+  class_names: [Angry, Disgust, Fear, Happy, Sad, Surprise, Neutral]
+  class_to_folder:
+    "0": "1"
+    "1": "2"
+    "2": "3"
+    "3": "4"
+    "4": "5"
+    "5": "6"
+    "6": "7"
+  val_split: 0.15
+  test_split: 0.15
+  use_predefined_split: true
+
+augmentation:
+  enabled: false
+  normalize:
+    mean: [0.5]
+    std: [0.5]
+
+model:
+  name: cnn
+  cnn:
+    channels: [32, 64, 128, 256]
+    kernel_sizes: [3, 3, 3, 3]
+    pool_sizes: [2, 2, 2, 2]
+    fc_dims: [512]
+    dropout: 0.5
+    batch_norm: true
+    activation: relu
+
+training:
+  batch_size: 64
+  epochs: 10
+  learning_rate: 0.001
+  optimizer: adam
+  optimizer_params:
+    betas: [0.9, 0.999]
+    eps: 1.0e-8
+  weight_decay: 0.0001
+  gradient_clip_value: 1.0
+  label_smoothing: 0.0
+  scheduler:
+    type: cosine_annealing
+    cosine_annealing:
+      T_max: 10
+      eta_min: 1.0e-6
+  kfold:
+    enabled: false
+  nested_kfold:
+    enabled: false
+  hyperparameter_tuning:
+    enabled: false
+  class_balancing:
+    enabled: true
+    method: class_weights
+  early_stopping:
+    enabled: true
+    patience: 3
+    monitor: val_loss
+    mode: min
+    min_delta: 0.001
+    restore_best_weights: true
+  checkpointing:
+    enabled: true
+    save_best_only: true
+    monitor: val_f1_macro
+    mode: max
+
+evaluation:
+  metrics: [loss, accuracy, f1_macro, f1_weighted, precision_macro,
+            precision_weighted, recall_macro, recall_weighted, auc_macro,
+            auc_weighted, auc_per_class, fpr_per_class, per_class,
+            confusion_matrix, classification_report, roc_curves,
+            confidence_intervals, timing]
+  confidence_interval: 0.95
+  bootstrap_iterations: 1000
+  compute_std: true
+  compute_time: true
+  confusion_matrix: true
+  classification_report: true
+  per_class_metrics: true
+  roc_curves: true
+
+logging:
+  verbose: 1
+  runs_dir: results/runs
+  save_plots: true
+  save_results_json: true
+  tensorboard:
+    enabled: false

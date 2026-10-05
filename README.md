@@ -2,12 +2,13 @@
 
 ## Training setup
 
-Install the dependencies in `config/requirements.txt` into the active Python
-environment, then run commands from the repository root.
+Create a project-local virtual environment, install the dependencies in
+`config/requirements.txt`, and run commands from the repository root.
 
 ```powershell
-python -m pip install -r config/requirements.txt
-python src/training/scripts/train_model.py --help
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r config/requirements.txt
+.\.venv\Scripts\python.exe src/training/scripts/train_model.py --help
 ```
 
 ## Standard training
@@ -102,3 +103,181 @@ python src/training/scripts/distributed_train.py --config config/model_config.ym
 This entry point detects multiple GPUs but currently refuses a multi-process
 launch until DDP process-group integration is added. Single-process execution
 uses the same trainer and output isolation as standard training.
+
+## Repository structure
+
+```text
+config/
+	model_config.yml             Master configuration example
+	requirements.txt             Python dependencies
+data/
+	raw/<class>/                 Input images grouped by class folder
+src/
+	data_pipeline/               Dataset, transforms, splits, and loaders
+	models/architectures/        Model implementations and model registry
+	training/
+		callbacks/                 Checkpoint, early-stopping, and TensorBoard helpers
+		experiments/               Reusable experiment configs and runners
+		metrics/                   Metric computation and fold aggregation
+		scripts/                   Standard, resume, and distributed entry points
+		strategies/                Device and distributed strategy helpers
+	testing/                     Unit and integration tests
+results/
+	runs/<run-name>/              Generated training artifacts
+docs/                           Checklists and project documentation
+notebooks/                      Analysis and result visualization notebooks
+```
+
+The reusable implementation lives under `src/`. Experiment-specific choices
+belong under `src/training/experiments/`; generated outputs belong under
+`results/runs/`, not beside the source configuration.
+
+## Data layout
+
+With `data.use_predefined_split: true`, images must use `train_` and `test_`
+filename prefixes:
+
+```text
+data/raw/
+	1/train_00001.jpg
+	1/test_00001.jpg
+	2/train_00002.jpg
+	2/test_00002.jpg
+	...
+	7/train_00007.jpg
+```
+
+The folder-to-class mapping is defined by `data.class_to_folder`. If
+`use_predefined_split` is false, the loader scans all images and creates
+stratified train, validation, and test partitions using `val_split` and
+`test_split`.
+
+## Configuration examples
+
+The master example is [config/model_config.yml](config/model_config.yml).
+Runnable experiment configs are:
+
+- [Experiment 1 config](src/training/experiments/experiment1/config.yml):
+	full nested-K-fold benchmark across all models.
+- [Experiment 2 config](src/training/experiments/experiment2/config.yml):
+	short CNN smoke test with augmentation disabled.
+
+Configs are standalone YAML files. To change an experiment, copy its config,
+change `model.name` or a training section, and use a new `--run-name`.
+
+Important switches:
+
+```yaml
+augmentation:
+	enabled: false
+
+training:
+	class_balancing:
+		enabled: true
+		method: class_weights       # class_weights or oversampling
+	nested_kfold:
+		enabled: true
+		outer_splits: 5
+		inner_splits: 3
+	early_stopping:
+		enabled: true
+	checkpointing:
+		enabled: true
+
+logging:
+	save_plots: true
+	tensorboard:
+		enabled: false
+```
+
+Setting augmentation to false disables random flips, rotations, affine
+transforms, color jitter, blur, and random erasing. Normalization still runs.
+
+## Artifact layout
+
+For `--run-name experiment1/cnn`, artifacts are written below:
+
+```text
+results/runs/experiment1/cnn/
+	models/
+		best_model_cnn.pt
+		last_checkpoint_cnn.pt
+	tables/
+		results_cnn.json
+		nested_kfold_results_cnn.json
+	logs/
+		epochs_cnn.jsonl
+		tensorboard/              When TensorBoard is enabled
+	plots/
+		history_cnn.png           When plot saving is enabled
+```
+
+Checkpoints include model, optimizer, scheduler, epoch, best metric,
+patience, and training history. Reusing an explicit run name overwrites files
+inside that run; a new run name preserves the previous run.
+
+## Command reference
+
+### `train_model.py`
+
+```text
+--config PATH       YAML configuration; default: config/model_config.yml
+--verbose LEVEL     0 disables progress, 1 prints progress; default: 1
+--run-name NAME     Explicit output directory name
+--resume PATH       Latest checkpoint to resume from
+```
+
+### `run_experiments.py`
+
+```text
+--config PATH       YAML configuration
+--models NAMES      One or more model names, or all
+--run-name NAME     Parent output directory; default: experiment
+--verbose LEVEL     Progress verbosity; default: 1
+```
+
+### `resume_training.py`
+
+```text
+checkpoint PATH     Path to last_checkpoint_<model>.pt
+--config PATH       YAML configuration
+--verbose LEVEL     Progress verbosity
+```
+
+### `distributed_train.py`
+
+```text
+--config PATH
+--run-name NAME
+--verbose LEVEL
+```
+
+## Typical workflow
+
+1. Run Experiment 2 to verify the environment and dataset.
+2. Inspect `results/runs/experiment2_cnn_smoke/tables/`.
+3. Run one model from Experiment 1 to estimate runtime.
+4. Run all models with `--models all`.
+5. Use the saved JSON files or [visualize_results.ipynb](notebooks/results/visualize_results.ipynb) for comparisons.
+6. Resume from `last_checkpoint_<model>.pt` if a run stops after a checkpoint.
+
+## Validation
+
+Compile the source tree:
+
+```powershell
+python -m compileall -q src
+```
+
+Run the available unit tests:
+
+```powershell
+python -m unittest discover -s src/testing
+```
+
+Install dependencies before running training or tests that import the full
+trainer:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r config/requirements.txt
+```
