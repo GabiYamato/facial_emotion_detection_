@@ -121,34 +121,45 @@ def create_dataloaders(
     eval_transform = build_transforms(config, split="test")
 
     # --- build datasets ---
-    train_ds = EmotionDataset(
-        root_dir=data_cfg["raw_dir"],
-        split="train",
-        transform=train_transform,
-        config=data_cfg,
-    )
-    test_ds = EmotionDataset(
-        root_dir=data_cfg["raw_dir"],
-        split="test",
-        transform=eval_transform,
-        config=data_cfg,
-    )
-
-    # --- validation split from training data ---
-    val_frac = data_cfg.get("val_split", 0.15)
-    labels = train_ds.get_labels()
-    indices = np.arange(len(train_ds))
-
-    train_idx, val_idx = train_test_split(
-        indices,
-        test_size=val_frac,
-        stratify=labels,
-        random_state=config["project"].get("seed", 42),
-    )
-
-    val_ds = train_ds.subset(val_idx)
+    if data_cfg.get("use_predefined_split", True):
+        train_ds = EmotionDataset(
+            root_dir=data_cfg["raw_dir"], split="train",
+            transform=train_transform, config=data_cfg,
+        )
+        test_ds = EmotionDataset(
+            root_dir=data_cfg["raw_dir"], split="test",
+            transform=eval_transform, config=data_cfg,
+        )
+        val_frac = data_cfg.get("val_split", 0.15)
+        labels = train_ds.get_labels()
+        indices = np.arange(len(train_ds))
+        train_idx, val_idx = train_test_split(
+            indices, test_size=val_frac, stratify=labels,
+            random_state=config["project"].get("seed", 42),
+        )
+        val_ds = train_ds.subset(val_idx)
+        train_ds_split = train_ds.subset(train_idx)
+    else:
+        full_ds = EmotionDataset(
+            root_dir=data_cfg["raw_dir"], split="all",
+            transform=train_transform, config=data_cfg,
+        )
+        labels = full_ds.get_labels()
+        indices = np.arange(len(full_ds))
+        train_val_idx, test_idx = train_test_split(
+            indices, test_size=data_cfg.get("test_split", 0.15),
+            stratify=labels, random_state=config["project"].get("seed", 42),
+        )
+        train_idx, val_idx = train_test_split(
+            train_val_idx, test_size=data_cfg.get("val_split", 0.15),
+            stratify=labels[train_val_idx],
+            random_state=config["project"].get("seed", 42),
+        )
+        train_ds_split = full_ds.subset(train_idx)
+        val_ds = full_ds.subset(val_idx)
+        test_ds = full_ds.subset(test_idx)
     val_ds.set_transform(eval_transform)
-    train_ds_split = train_ds.subset(train_idx)
+    test_ds.set_transform(eval_transform)
 
     if verbose >= 1:
         print(f"  [Data] Train: {len(train_ds_split)} | Val: {len(val_ds)} | Test: {len(test_ds)}")

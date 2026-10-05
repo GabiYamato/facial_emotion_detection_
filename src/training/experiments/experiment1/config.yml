@@ -1,1 +1,243 @@
-# Configuration
+# Experiment 1: nested cross-validation across every registered model.
+
+project:
+  name: facial_emotion_detection_experiment1
+  seed: 42
+  device: auto
+  deterministic: true
+  num_workers: 4
+  pin_memory: true
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  image_size: [48, 48]
+  color_mode: grayscale
+  num_classes: 7
+  class_names: [Angry, Disgust, Fear, Happy, Sad, Surprise, Neutral]
+  class_to_folder:
+    "0": "1"
+    "1": "2"
+    "2": "3"
+    "3": "4"
+    "4": "5"
+    "5": "6"
+    "6": "7"
+  val_split: 0.15
+  test_split: 0.15
+  use_predefined_split: true
+  cache_images: false
+
+augmentation:
+  enabled: false
+  train:
+    random_horizontal_flip: 0.5
+    random_rotation: 10
+    random_affine:
+      enabled: false
+      degrees: 10
+      translate: [0.1, 0.1]
+      scale: [0.9, 1.1]
+    random_erasing:
+      enabled: false
+      p: 0.2
+      scale: [0.02, 0.15]
+    color_jitter:
+      enabled: false
+      brightness: 0.2
+      contrast: 0.2
+      saturation: 0.0
+      hue: 0.0
+    gaussian_blur:
+      enabled: false
+      kernel_size: 3
+  normalize:
+    mean: [0.5]
+    std: [0.5]
+
+model:
+  name: cnn
+  cnn:
+    channels: [32, 64, 128, 256]
+    kernel_sizes: [3, 3, 3, 3]
+    pool_sizes: [2, 2, 2, 2]
+    fc_dims: [512]
+    dropout: 0.5
+    batch_norm: true
+    activation: relu
+  rnn:
+    hidden_size: 256
+    num_layers: 2
+    dropout: 0.3
+    bidirectional: false
+    nonlinearity: tanh
+    fc_dims: [128]
+  lstm:
+    hidden_size: 256
+    num_layers: 2
+    dropout: 0.3
+    bidirectional: false
+    fc_dims: [128]
+  lstm_attention:
+    hidden_size: 256
+    num_layers: 2
+    dropout: 0.3
+    attention_dim: 128
+    fc_dims: [128]
+  bilstm:
+    hidden_size: 256
+    num_layers: 2
+    dropout: 0.3
+    fc_dims: [128]
+  bilstm_attention:
+    hidden_size: 256
+    num_layers: 2
+    dropout: 0.3
+    attention_dim: 128
+    fc_dims: [128]
+  residual_bilstm:
+    hidden_size: 256
+    num_layers: 4
+    dropout: 0.3
+    fc_dims: [128]
+  cnn_lstm:
+    cnn_channels: [32, 64, 128]
+    cnn_kernel_sizes: [3, 3, 3]
+    lstm_hidden_size: 256
+    lstm_num_layers: 2
+    lstm_dropout: 0.3
+    fc_dims: [128]
+    dropout: 0.5
+  cnn_bilstm:
+    cnn_channels: [32, 64, 128]
+    cnn_kernel_sizes: [3, 3, 3]
+    lstm_hidden_size: 256
+    lstm_num_layers: 2
+    lstm_dropout: 0.3
+    fc_dims: [128]
+    dropout: 0.5
+  vision_transformer:
+    patch_size: 8
+    embed_dim: 256
+    num_heads: 8
+    num_layers: 6
+    mlp_dim: 512
+    dropout: 0.1
+    emb_dropout: 0.1
+  swin_transformer:
+    patch_size: 4
+    embed_dim: 96
+    depths: [2, 2, 6, 2]
+    num_heads: [3, 6, 12, 24]
+    window_size: 6
+    mlp_ratio: 4.0
+    dropout: 0.1
+    attention_dropout: 0.1
+
+training:
+  batch_size: 64
+  epochs: 100
+  learning_rate: 0.001
+  optimizer: adam
+  optimizer_params:
+    betas: [0.9, 0.999]
+    eps: 1.0e-8
+    momentum: 0.9
+    nesterov: true
+  weight_decay: 0.0001
+  gradient_clip_value: 1.0
+  label_smoothing: 0.0
+  scheduler:
+    type: cosine_annealing
+    cosine_annealing:
+      T_max: 100
+      eta_min: 1.0e-6
+    step:
+      step_size: 20
+      gamma: 0.5
+    reduce_on_plateau:
+      mode: min
+      factor: 0.5
+      patience: 5
+      min_lr: 1.0e-7
+    cosine_warm_restarts:
+      T_0: 10
+      T_mult: 2
+      eta_min: 1.0e-6
+    one_cycle:
+      max_lr: 0.01
+      pct_start: 0.3
+      anneal_strategy: cos
+  kfold:
+    enabled: false
+    n_splits: 5
+    shuffle: true
+    stratified: true
+  nested_kfold:
+    enabled: true
+    outer_splits: 5
+    inner_splits: 3
+    shuffle: true
+    stratified: true
+    selection_metric: f1_macro
+  hyperparameter_tuning:
+    enabled: false
+    backend: optuna
+    n_trials: 30
+    timeout: 7200
+    direction: maximize
+    metric: val_f1_macro
+    pruning: true
+    search_spaces: {}
+  class_balancing:
+    enabled: true
+    method: class_weights
+  early_stopping:
+    enabled: true
+    patience: 15
+    monitor: val_loss
+    mode: min
+    min_delta: 0.001
+    restore_best_weights: true
+  checkpointing:
+    enabled: true
+    save_best_only: true
+    monitor: val_f1_macro
+    mode: max
+
+evaluation:
+  metrics:
+    - loss
+    - accuracy
+    - f1_macro
+    - f1_weighted
+    - precision_macro
+    - precision_weighted
+    - recall_macro
+    - recall_weighted
+    - auc_macro
+    - auc_weighted
+    - auc_per_class
+    - fpr_per_class
+    - per_class
+    - confusion_matrix
+    - classification_report
+    - roc_curves
+    - confidence_intervals
+    - timing
+  confidence_interval: 0.95
+  bootstrap_iterations: 1000
+  compute_std: true
+  compute_time: true
+  confusion_matrix: true
+  classification_report: true
+  per_class_metrics: true
+  roc_curves: true
+
+logging:
+  verbose: 1
+  runs_dir: results/runs
+  save_plots: true
+  save_results_json: true
+  tensorboard:
+    enabled: false

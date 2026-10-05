@@ -44,6 +44,7 @@ data:
     "6": "7"
   val_split: 0.15                 # fraction of train data used for validation
   use_predefined_split: true      # use train_/test_ filename prefix to split
+  test_split: 0.15                # test fraction when predefined split is disabled
   cache_images: false             # load all images into RAM
 
 # ---------------------------------------------------------------------------
@@ -243,6 +244,7 @@ training:
     inner_splits: 3               # inner loop for hyperparameter tuning
     shuffle: true
     stratified: true
+    selection_metric: f1_macro
 
   # ----- Hyperparameter Tuning -----
   hyperparameter_tuning:
@@ -332,3 +334,4 @@ logging:
     enabled: false
     log_dir: results/logs/tensorboard
   progress_bar: true              # tqdm progress bar
+  runs_dir: results/runs
